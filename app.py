@@ -1,71 +1,85 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
-from ui_components import apply_enterprise_style, draw_sidebar_nav
-from calculations import calculate_metrics, solve_capital_rationing
+from styles import apply_theme
+from engine import run_capital_rationing
 
-st.set_page_config(page_title="CapitalIQ-AI Enterprise", layout="wide")
-apply_enterprise_style()
+st.set_page_config(page_title="Strategic Capital Allocator", layout="wide")
+apply_theme()
 
-# Sidebar & Navigation
-page, total_budget = draw_sidebar_nav()
+# --- Sidebar Navigation (Logical Steps) ---
+st.sidebar.title("Decision Workflow")
+step = st.sidebar.radio("Navigate Process", [
+    "1. Decision Context",
+    "2. Financial Evaluation",
+    "3. Forward-Looking Analysis",
+    "4. Capital Trade-offs",
+    "5. Uncertainty & Scenarios",
+    "6. Decision Summary",
+    "7. AI Interpretation"
+])
 
-if page == "📊 Executive Summary":
-    st.header("Executive Dashboard")
+# --- Shared Data State ---
+if 'projects' not in st.session_state:
+    st.session_state.projects = pd.DataFrame([
+        {"Project": "Expansion A", "Investment": 500, "NPV": 150, "Risk": "Low"},
+        {"Project": "R&D Alpha", "Investment": 300, "NPV": 200, "Risk": "High"},
+        {"Project": "IT Modernization", "Investment": 200, "NPV": 50, "Risk": "Med"}
+    ])
+
+# --- Step 1: Decision Context ---
+if step == "1. Decision Context":
+    st.markdown('<p class="step-header">Phase 1</p>', unsafe_allow_html=True)
+    st.title("Strategic Framing")
     
-    # Top Row Metrics
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Projects Funded", "12", "Total: 50", delta_color="normal")
-    m2.metric("Capital Deployed", "₹14.94M", "Util: 99.6%", delta_color="normal")
-    m3.metric("Projected NPV", "₹2.34M", "Payback: 0.8 Yrs", delta_color="normal")
-    m4.metric("Avg Risk Score", "7.08", "Max: 6.5", delta_color="inverse")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("Business Context")
+        st.text_area("Investment Objective", "Allocate surplus capital for FY2026 growth initiatives.")
+        horizon = st.selectbox("Investment Horizon", ["3 Years", "5 Years", "10 Years"])
+    with col2:
+        st.subheader("Constraint Framing")
+        total_budget = st.number_input("Total Capital Available ($M)", value=1000)
+        risk_appetite = st.select_slider("Risk Tolerance", ["Conservative", "Moderate", "Aggressive"])
 
-    st.markdown("---")
+# --- Step 2: Project Financial Evaluation ---
+elif step == "2. Financial Evaluation":
+    st.title("Fundamental Analysis")
+    st.write("Finance-first screening of individual project merits.")
+    st.data_editor(st.session_state.projects, use_container_width=True)
     
-    col_left, col_right = st.columns([2, 1])
+    # NPV/IRR Logic visualization
+    st.info("📌 Signals: Evaluation based on Cash-Flow Volatility and Payback, not just ROI.")
 
-    with col_left:
-        st.subheader("Capital Allocation by Department")
-        # Mock Data for the Stacked Bar Chart
-        dept_data = pd.DataFrame({
-            'Department': ['Supply Chain', 'Infrastructure', 'Marketing', 'R&D', 'HR', 'IT Transformation'],
-            'Base': [3.0, 1.2, 1.5, 0.16, 0.74, 0.8],
-            'Growth': [2.6, 1.4, 0.54, 0.0, 0.95, 0.0],
-            'Strategic': [1.7, 0.0, 0.0, 0.0, 0.45, 0.0],
-            'ROI': [25, 22, 18, 12, 20, 15]
-        })
-        
-        fig = px.bar(dept_data, x='Department', y=['Base', 'Growth', 'Strategic'],
-                     title="Budget Distribution (Colored by Project Type)",
-                     color_discrete_sequence=['#96D701', '#E8F11B', '#00D1FF'])
-        
-        fig.update_layout(template="plotly_dark", plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
-        st.plotly_chart(fig, use_container_width=True)
-
-    with col_right:
-        st.subheader("Actionable Reports")
-        st.button("📄 Download Official PDF Report")
-        
-        st.markdown("#### 📈 Top ROI Drivers")
-        importance_df = pd.DataFrame({
-            'Feature': ['Market_Trend_Index', 'Risk_Score', 'Investment_Capital', 'Duration_Months', 'Strategic_Alignment'],
-            'Importance': [0.477, 0.192, 0.165, 0.109, 0.054]
-        })
-        st.table(importance_df)
-
-elif page == "📉 Scenario Manager":
-    st.header("What-If Scenario Analysis")
-    st.info("Simulate changes in market volatility and interest rates to see portfolio impact.")
-    # Add sensitivity sliders here
+# --- Step 4: Capital Trade-offs (Your Signature Section) ---
+elif step == "4. Capital Trade-offs":
+    st.title("Capital Rationing & Priority")
+    budget = st.slider("Adjust Budget Constraint", 100, 2000, 700)
     
-elif page == "🏠 Home & Data":
-    st.header("Project Intake & Database")
-    uploaded_file = st.file_uploader("Upload Project Proposals (CSV/XLSX)")
-    if uploaded_file:
-        st.success("Data ingested successfully. Ready for AI Evaluation.")
+    results, spent = run_capital_rationing(st.session_state.projects, budget)
+    
+    st.subheader(f"Portfolio Results (${spent}M / ${budget}M Utilized)")
+    st.table(results[['Project', 'Investment', 'NPV', 'PI', 'Status']])
+    
+    # Trade-off Visualization
+    fig = px.bar(results, x="Project", y="NPV", color="Status", 
+                 title="The Cost of Scarcity: Funded vs. Deferred Projects")
+    st.plotly_chart(fig)
 
-# Placeholder for other pages to keep the student's project structure
-else:
-    st.title(f"{page}")
-    st.write("This module is currently processing live data...")
+# --- Step 6: Decision Summary ---
+elif step == "6. Decision Summary":
+    st.title("Investment Committee Readiness")
+    st.markdown("""
+    ### Final Recommendation Log
+    - **Total Allocation:** Approved projects represent 85% of risk budget.
+    - **Key Rationale:** Prioritized high PI projects over high absolute NPV to maximize capital efficiency.
+    - **Risk Flags:** R&D Alpha is highly sensitive to WACC fluctuations.
+    """)
+    if st.button("Generate Governance Memo"):
+        st.success("Memo exported for Investment Committee review.")
+
+# --- Step 7: AI Interpretation Assistant ---
+elif step == "7. AI Interpretation":
+    st.title("Analytical Support")
+    st.chat_input("Ask about the logic (e.g., 'Why was Project B deferred?')")
+    st.markdown("> **Note:** This assistant explains calculations and clarifies assumptions; it does not provide autonomous advice.")
